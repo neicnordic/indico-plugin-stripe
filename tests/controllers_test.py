@@ -7,10 +7,10 @@
 
 import pytest
 from flask import request
-from mock import MagicMock
+from unittest.mock import MagicMock
 
 from indico.modules.events.payment.models.transactions import TransactionAction
-from indico_payment_stripe.controllers import RHStripe
+from indico_payment_stripe.controllers import RHStripeIntent, RHStripeReturn
 from indico_payment_stripe.plugin import StripePaymentPlugin
 
 
@@ -30,7 +30,7 @@ from indico_payment_stripe.plugin import StripePaymentPlugin
         (True, 'OSK', 'OPK', 'ESK', 'EPK', 'ESK', 'EPK'),
     ]
 )
-def test_handler_process(
+def test_return_process(
     curr, indico_amount, stripe_amount,
     settings_value, org_sec_key, org_pub_key, event_sec_key, event_pub_key,
     eff_sec_key, eff_pub_key,
@@ -62,16 +62,13 @@ def test_handler_process(
 
     rt = mocker.patch('indico_payment_stripe.controllers.register_transaction')
     stripe = mocker.patch('indico_payment_stripe.controllers.stripe')
-    stripe_charge = stripe.Charge.create
+    stripe_payment_intent = stripe.PaymentIntent.retrieve
     # This is a pared down return value of the API call, where we only define
     # the attributes actually used afterwards.
-    stripe.Charge.create.return_value = {
+    stripe.PaymentIntent.retrieve.return_value = {
         'status': 'succeeded',
         'amount': stripe_amount,
         'currency': curr,
-        'outcome': {
-            'type': 'authorized'
-        },
         'receipt_url': 'https://foo.com'
     }
 
@@ -91,18 +88,13 @@ def test_handler_process(
     rh.stripe_email = 'foo@foo.com'
 
     request.args = {
-        'registrantId': '1',
         'token': 'c6ea3f2b-062f-4371-8927-21e543be3ead',
-    }
-    request.form = {
-        'stripeToken': rh.stripe_token,
-        'stripeTokenType': rh.stripe_token_type,
-        'stripeEmail': rh.stripe_email,
+        'payment_intent': 'pi_3N2wmHEAduOhytb20RAAXhIB',
     }
     with StripePaymentPlugin.instance.plugin_context():
         rh._process()
 
-    stripe_charge.assert_called_once_with(
+    stripe_payment_intent.assert_called_once_with(
         api_key=eff_sec_key,
         amount=stripe_amount,
         currency=curr.lower(),
@@ -115,5 +107,4 @@ def test_handler_process(
         currency=curr,
         action=TransactionAction.complete,
         provider='stripe',
-        data=request.form,
     )

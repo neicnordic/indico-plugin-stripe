@@ -1,33 +1,91 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Payment Form</title>
-  </head>
-  <body>
-    <dl class="i-data-list">
-      <dt>{% trans %}First name{% endtrans %}</dt>
-      <dd>{{ registration.first_name }}</dd>
-      <dt>{% trans %}Last name{% endtrans %}</dt>
-      <dd>{{ registration.last_name }}</dd>
-      <dt>{% trans %}Total amount{% endtrans %}</dt>
-      <dd>{{ format_currency(amount, currency, locale=session.lang) }}</dd>
-      <dt></dt>
-      <form action="{{ handler_url }}" method="POST">
-        <script
-          src="https://checkout.stripe.com/checkout.js" class="stripe-button"
-          data-key="{{ pub_key }}"
-          data-amount="{{ stripe_amount }}"
-          data-currency="{{ currency }}"
-          data-name="{{ event_settings.org_name }}"
-          data-description="{{ event_settings.description }}"
-          data-locale="auto"
-          data-zip-code="{{ event_settings.require_postal_code|string|lower }}"
-          data-email="{{ user_email }}"
-          data-allow-remember-me="false"
-          data-image="https://stripe.com/img/documentation/checkout/marketplace.png">
-        </script>
-      </form>
-      </dd>
-    </dl>
-  </body>
-</html>
+<dl class="i-data-list">
+  <dt>{% trans %}First name{% endtrans %}</dt>
+  <dd>{{ registration.first_name }}</dd>
+  <dt>{% trans %}Last name{% endtrans %}</dt>
+  <dd>{{ registration.last_name }}</dd>
+  <dt>{% trans %}Total amount{% endtrans %}</dt>
+  <dd>{{ format_currency(amount, currency, locale=session.lang) }}</dd>
+  <dt></dt>
+  <form id="payment-form">
+    <div id="link-authentication-element"></div>
+    <div id="payment-element"></div>
+    <div style="height: 1em"></div>
+    <button id="submit" class="ui primary button" disabled>{% trans %}Pay now{% endtrans %}</button>
+    <div id="payment-message" style="font-weight: bold;"></div>
+  </form>
+  <script defer>
+  var script = document.createElement('script');
+  script.src = 'https://js.stripe.com/v3/';
+  script.onload = function() {
+    // Based on the payment intents quickstart
+    // https://stripe.com/docs/payments/quickstart
+    const stripe = Stripe("{{ pub_key }}");
+    let elements;
+    initialize();
+
+    document
+      .querySelector("#payment-form")
+      .addEventListener("submit", handleSubmit);
+
+    let emailAddress = '';
+    async function initialize() {
+      const response = await fetch("{{ intent_url }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const { clientSecret } = await response.json();
+
+      const appearance = {
+        theme: 'stripe',
+      };
+      elements = stripe.elements({ appearance, clientSecret });
+
+      const linkAuthenticationElement = elements.create("linkAuthentication", options={defaultValues: {email: '{{ user_email }}'} });
+      linkAuthenticationElement.mount("#link-authentication-element");
+      linkAuthenticationElement.on('change', (event) => {
+        emailAddress = event.value.email;
+      });
+
+      const paymentElementOptions = {
+        layout: "tabs",
+      };
+
+      const paymentElement = elements.create("payment", paymentElementOptions);
+      paymentElement.mount("#payment-element");
+
+      setTimeout(() => {
+        document.getElementById("submit").disabled = false;
+      }, 2000);
+    }
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      showMessage("");
+      document.getElementById("submit").disabled = true;
+
+      const { error } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: "{{ return_url }}",
+          receipt_email: emailAddress,
+        },
+      });
+
+      if (error.type === "card_error" || error.type === "validation_error") {
+        showMessage(error.message);
+      } else {
+        showMessage("An unexpected error occurred.");
+      }
+      document.getElementById("submit").disabled = false;
+    }
+
+    function showMessage(messageText) {
+      const messageContainer = document.querySelector("#payment-message");
+      messageContainer.textContent = messageText;
+    }
+  };
+  document.head.appendChild(script);
+  </script>
+  </dd>
+</dl>

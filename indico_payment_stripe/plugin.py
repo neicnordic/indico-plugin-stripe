@@ -7,7 +7,7 @@
 
 """
 
-from wtforms.fields.core import BooleanField, StringField
+from wtforms.fields import BooleanField, StringField
 from wtforms.validators import DataRequired, Optional
 
 from indico.core.plugins import IndicoPlugin, url_for_plugin
@@ -135,6 +135,10 @@ class StripePaymentPlugin(PaymentPluginMixin, IndicoPlugin):
         'require_postal_code': False,
     }
 
+    def init(self):
+        super(StripePaymentPlugin, self).init()
+        # self.inject_bundle('indico_payment_stripe.js')
+
     @property
     def logo_url(self):
         return url_for_plugin(self.name + '.static', filename='images/logo.png')
@@ -149,12 +153,16 @@ class StripePaymentPlugin(PaymentPluginMixin, IndicoPlugin):
             registration.currency,
         )
         data['user_email'] = registration.email
-        data['handler_url'] = url_for_plugin(
-            'payment_stripe.handler',
+        data['intent_url'] = url_for_plugin(
+            'payment_stripe.intent',
             registration.locator.uuid,
             _external=True,
         )
-
+        data['return_url'] = url_for_plugin(
+            'payment_stripe.return',
+            registration.locator.uuid,
+            _external=True,
+        )
         data['pub_key'] = (
             data['event_settings']['pub_key']
             if data['event_settings']['use_event_api_keys'] else

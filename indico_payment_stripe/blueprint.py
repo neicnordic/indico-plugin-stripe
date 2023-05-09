@@ -10,16 +10,17 @@ from __future__ import unicode_literals
 
 from indico.core.plugins import IndicoPluginBlueprint
 
-from indico_payment_stripe.controllers import RHStripe
+from indico_payment_stripe.controllers import RHStripeIntent, RHStripeReturn
 
 
 blueprint = IndicoPluginBlueprint(
     'payment_stripe',
     __name__,
     url_prefix=(
-        '/event/<confId>/registrations/'
+        '/event/<int:event_id>/registrations/'
         '<int:reg_form_id>/payment/response/stripe'
     )
 )
 
-blueprint.add_url_rule('/handler', 'handler', RHStripe, methods=['POST'])
+blueprint.add_url_rule('/intent', 'intent', RHStripeIntent, methods=['POST'])
+blueprint.add_url_rule('/return', 'return', RHStripeReturn)

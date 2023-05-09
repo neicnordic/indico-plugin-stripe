@@ -20,12 +20,14 @@ Issues
 Check out our `issue tracker <https://github.com/neicnordic/indico-plugin-stripe/issues>`_ for a complete list of
 outstanding issues. We welcome any kind of contributions, from bug reports to pull requests.
 
+Installation
+------------
+
+.. code-block:: bash
+    $ pip install https://github.com/neicnordic/indico-plugin-stripe.git
 
 Requirements
 ------------
-
-* Python 2.7
-
 
 Development
 -----------
